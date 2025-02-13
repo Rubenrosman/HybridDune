@@ -20,7 +20,7 @@ def disper(w, h, g=9.8):
     k = disper(w, h, [g])
     
     Input:
-    w = 2*pi/T, were T is wave period
+    w = 2*pi/T, were T is wave period  #of the longest wave that fits in the frequency axis?
     h = water depth
     g = gravity constant
     
@@ -47,7 +47,7 @@ def disper(w, h, g=9.8):
     wNul = w==0
     w[w==0] = np.nan
 
-    
+    # intermediate water 
     w2 = w**2*h/g
     q = w2 / (1-np.exp(-w2**(5/4)))**(2/5)
     
@@ -313,8 +313,14 @@ def attenuation_factor(Type, elev, h, fx,
                        fcorrmaxBelieve = 1,
                        fcorrmax = 1.5):
     """
-    computes attenuation correction factor based on linear theory
+    Computes attenuation correction factor based on linear theory:
 
+    This function calculates the attenuation correction factor based on the signal type 
+    (pressure, horizontal, or vertical) and uses wave physics (like the dispersion relationship) 
+    to determine how much the amplitude of a signal should be adjusted at different frequencies. 
+    This adjustment accounts for the energy loss or gain that waves experience as they travel 
+    through a medium, based on the position and type of instrument used.
+    
     Parameters
     ----------
     Type : STRING
@@ -426,7 +432,7 @@ def attenuation_corrected_wave_spectrum(Type,sf,x,h,zi,zb,
 def attenuate_signal(Type,f,x,hmean,zi,zb,
                      detrend = True,  
                      rho = 1000,
-                     g = 9.8,
+                     g = 9.81,
                      removeNoise = False,
                      **kwargs
                      ):
@@ -473,23 +479,24 @@ def attenuate_signal(Type,f,x,hmean,zi,zb,
     #         f = 1/ ( np.mean(np.diff(t))/ np.timedelta64(1, 's'))        
     #     except:
     #         f = 1/ ( np.mean(np.diff(t)))
-    elev = zi - zb #height of instrument above the bed
+    
+    # construct time array for plotting
+    t = np.arange(0,len(x)/f, 1/f)
+    elev = zi-zb #height of instrument above the bed
 
     if Type == 'pressure':
-        x = x/rho/g + 
+        x = x/rho/g + elev
         
     if detrend: 
         pex = x-signal.detrend(x)
         x = x-pex
    
-    
-     # construct time array
+       
+     # construct time array for fourier analysis
     Nr = len(x)
     deltaf = f/Nr
     ff = deltaf*np.append(np.arange(0,np.round(Nr/2)),
                           - np.arange(np.round(Nr/2),0,-1))
-
-     
         
     # into frequency domain
     xf = fft(x)
@@ -501,6 +508,7 @@ def attenuate_signal(Type,f,x,hmean,zi,zb,
         ffloor = fxc[dvy3.argmax()+4]
         xf[ff>ffloor] = 0
     
+
     swfactor = attenuation_factor(Type, elev, hmean, ff, **kwargs)           
     #this was computed for vardensity spectrum but fft is not a power spectrum!
     swfactor = np.sqrt(swfactor)
@@ -509,9 +517,9 @@ def attenuate_signal(Type,f,x,hmean,zi,zb,
     zs = ifft(vardens).real
     
     if (detrend & (Type=='pressure')):
-        zs = zs + pex 
+        zs = zs + pex
      
-    return zs
+    return t, zs
 
 
 def jspect(X,Y,N,DT=1,DW='hann',OVERLAP=0,DETREND=1,jaPrint = False):
