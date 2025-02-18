@@ -36,6 +36,8 @@ translation_matrix_CC - translation_matrix_calc;  % same result
 xyz_RD_calc = xyz * rotation_matrix_calc' + translation_matrix_calc'
 error = xyz_RD_measured - xyz_RD_calc; % difference measured and calculated RD x,y,z coordinates, in m
 distance = sqrt( error(:,1).^2 + error(:,2).^2 + error(:,3).^2 ); % total error per point, in m
+
+% combine all data in single table
 table_all = table(xyz,xyz_RD_measured,xyz_RD_calc,error,distance);
 table_all  = splitvars(table_all,{'xyz', 'xyz_RD_measured', 'xyz_RD_calc', 'error', 'distance'},...
     'NewVariableNames',{{'x local', 'y local', 'z local'},...
