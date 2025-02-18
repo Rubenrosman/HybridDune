@@ -2,7 +2,7 @@
 clear,clc
 figure(2), clf(2), hold on
 
-for n=1:4
+for n=1%:4
 map{1} = 'O:\2024-12-18 to 2024-12-20, Storm 1\Lidars\20241220_LiDAR2\10s interval data\';  % storm 1
 map{2} = 'O:\2024-12-18 to 2024-12-20, Storm 1\Lidars\20241220_LiDAR2\10s interval data\';  % storm 1
 map{3} = 'O:\2024-12-18 to 2024-12-20, Storm 1\Lidars\20241220_LiDAR2\10s interval data\';  % storm 1
@@ -20,47 +20,47 @@ ptCloud = pcread(map_naam); % load pointcloud
 xyz = ptCloud.Location;
 intensity = ptCloud.Intensity;
 x = xyz(:,1);
-z = xyz(:,2);
+y = xyz(:,2);
 z = xyz(:,3);
-[azimuth,elevation,r] = cart2sph(x,z,z);
-
-% set polar coordinates in degrees and sort points
-azimuth  = rad2deg(azimuth );
-elevation = rad2deg(elevation);
-
-% sort rows by profile number, then angle coordinate
-elevation_round = round(elevation,2);
-sphere_coor = [elevation_round,azimuth,elevation,r,intensity]; % temporary add rounded elevation coord. for sorting
-sphere_coor = sortrows(sphere_coor,[1 2]);  % sort first by the first column (rounded elev.), then the second (azi.)
-
-% determine profile number 
-n_profile = single( [1; 1 + cumsum(logical(diff(sphere_coor(:,1))))] );
-
-% detemrine angle number
-n_hoek = ceil( (sphere_coor(:,2)+180)*2 );
-
-% determine echo count
-azimuth_round = round( sphere_coor(:,2), 2 );
-echo_count = count_consequetive_equal_down(azimuth_round);
-
-sphere_coor = sphere_coor(:,2:end); % remove first column (rounded elevation coordinates)
-
-% save as new pointcloud variable
-azimuth  = deg2rad(sphere_coor(:,1));
-elevation = deg2rad(sphere_coor(:,2));
-
-[x,z,z] = sph2cart(azimuth,elevation,sphere_coor(:,3));
-xyz = [x,z,z];
-I   = sphere_coor(:,4);
-
-i_recht = n_profile==3;
-x2 = x(i_recht)/1000;
-y2 = z(i_recht)/1000;
-z2 = z(i_recht)/1000;
+% [azimuth,elevation,r] = cart2sph(x,y,z);
+% 
+% % set polar coordinates in degrees and sort points
+% azimuth  = rad2deg(azimuth );
+% elevation = rad2deg(elevation);
+% 
+% % sort rows by profile number, then angle coordinate
+% elevation_round = round(elevation,2);
+% sphere_coor = [elevation_round,azimuth,elevation,r,intensity]; % temporary add rounded elevation coord. for sorting
+% sphere_coor = sortrows(sphere_coor,[1 2]);  % sort first by the first column (rounded elev.), then the second (azi.)
+% 
+% % determine profile number 
+% n_profile = single( [1; 1 + cumsum(logical(diff(sphere_coor(:,1))))] );
+% 
+% % detemrine angle number
+% n_hoek = ceil( (sphere_coor(:,2)+180)*2 );
+% 
+% % determine echo count
+% azimuth_round = round( sphere_coor(:,2), 2 );
+% echo_count = count_consequetive_equal_down(azimuth_round);
+% 
+% sphere_coor = sphere_coor(:,2:end); % remove first column (rounded elevation coordinates)
+% 
+% % save as new pointcloud variable
+% azimuth  = deg2rad(sphere_coor(:,1));
+% elevation = deg2rad(sphere_coor(:,2));
+% 
+% [x,y,z] = sph2cart(azimuth,elevation,sphere_coor(:,3));
+% xyz = [x,y,z];
+% I   = sphere_coor(:,4);
+% 
+% i_recht = n_profile==3;
+x2 = x/1000;
+y2 = y/1000;
+z2 = z/1000;
 xyz2=[x2,y2,z2];
 
 
-scatter(y2,-x2)
+scatter(y2,z2)
 end
 legend
 
@@ -69,9 +69,11 @@ legend
 clear,clc
 load('O:\2024-12-18 to 2024-12-20, Storm 1\Lidars\20241220_LiDAR2\10s interval data.mat')  % load file with 10s data of storm1, lidar2
 
+%% plot from above dataset
 figure(1), clf(1), hold on
 t=5000:72:6000;   % select time steps to use. here every 72 files, so every 72*10s=720 s. i.e. 5 plots per hour
-color_map = colorcet('GOULDIAN','N',length(t));  % colormap, to assign different times different colors
+color_map = colorcet('GOULDIAN','N',length(t));  % colormap, to assign different times different colors 
+% color_map = parula(length(t)); % colorcet is downloaded function. For native matlab alternative, comment line above, uncomment this one
 
 for n = 1:length(t)        % for selected time steps
     for profiel = 3%1:16   % and selected profiles.  profile 3 is perdendicular to coastline
