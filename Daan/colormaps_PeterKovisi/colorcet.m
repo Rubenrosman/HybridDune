@@ -17928,7 +17928,7 @@ end
     end
 
     % Subsample if specified
-    if N < size(map,1)
+    if N ~= size(map,1)
         tmap = map;
         tN = size(tmap,1);
         map = zeros(N,3);
