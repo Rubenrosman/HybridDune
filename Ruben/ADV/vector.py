@@ -175,7 +175,7 @@ class Vector(object):
             skipBursts = np.floor((self.tstart - self.startTime).total_seconds()/self.burstInterval) 
             
             self.burstStartTimes = pd.date_range(start=self.tstart, periods=nBursts,
-                                               freq='{}S'.format(self.burstInterval))
+                                               freq='{}s'.format(self.burstInterval))
             burstLocalTime = np.cumsum([1/self.frequency]*self.samplesPerBurst) - 1/self.frequency
             
             dt = pd.to_timedelta(burstLocalTime, unit='s')
@@ -217,7 +217,7 @@ class Vector(object):
                 nSamples = nBursts*self.samplesPerBurst
                 
                 self.burstStartTimes = pd.date_range(start = self.tstart,periods = nBursts,
-                                                freq = '{}S'.format(self.burstInterval))
+                                                freq = '{}s'.format(self.burstInterval))
                 burstLocalTime = np.cumsum([1/self.frequency]*self.samplesPerBurst) -1/self.frequency
                 
                 dt = pd.to_timedelta(burstLocalTime, unit='s')
@@ -231,7 +231,7 @@ class Vector(object):
             else:  # continuous measurements
                 nSamples = (self.tstop-self.tstart).total_seconds()*self.frequency
                 timeDat = pd.date_range(start =self.tstart, periods = nSamples,
-                                        freq = '{}S'.format(1/self.frequency))       
+                                        freq = '{}s'.format(1/self.frequency))       
                 skipRowsDat = (self.tstart - self.startTime).total_seconds()*self.frequency   
             
             # print('number of rows to skip = {}'.format(int(skipRowsDat)))         
@@ -286,7 +286,7 @@ class Vector(object):
         # on the SEN file a new line for every second
         #----------------------------------------------------------------------   
         timeSen = pd.date_range(start = self.tstart, periods = nSamples,
-                                freq = '1S')
+                                freq = '1s')
         skipRowsSen = (self.tstart-self.startTime).total_seconds()
         # print('number of rows to skip = {}'.format(int(skipRowsSen)))
 
@@ -320,7 +320,7 @@ class Vector(object):
         df2 = df2.set_index(['t'])
         
         # resample such that it is on same frequency as the .dat df
-        df2 = df2.resample('{}S'.format(1/self.frequency)).asfreq()
+        df2 = df2.resample('{}s'.format(1/self.frequency)).asfreq()
         df2 = df2.interpolate('linear')
         
         # join into one dataframe
