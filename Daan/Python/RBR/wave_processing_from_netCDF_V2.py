@@ -10,7 +10,7 @@ import xarray as xr
 import matplotlib.pyplot as plt
 import sys
 from scipy.signal import welch
-sys.path.append(r'C:\Users\dpoppema\OneDrive - Delft University of Technology\Documents\GitHub\HybridDune\Ruben\Pressure_sensors\S1\RBR_05') # to find the puv.py file
+#sys.path.append(r'C:\Users\dpoppema\OneDrive - Delft University of Technology\Documents\GitHub\HybridDune\Ruben\Pressure_sensors\S1\RBR_05') # to find the puv.py file
 import puv 
 
 
@@ -328,7 +328,7 @@ names_all = ['S1P3 RBR5', 'S2P3 RBR1', 'S3P3 RBR6', 'S4P3 RBR2','S1P2 RBR3'] # p
 
 for i in range(0,5):
     input_file = 'Pressure sensor ' + names_all[i] + ' p_rel - period 1.nc'
-    output_file = 'Pressure sensor ' + names_all[i] + ' processed data - period 1 V2.nc'
+    output_file = 'Pressure sensor ' + names_all[i] + ' processed data - period 1.nc'
 
     # Call the function to process the wave data
     wave_statistics_netcdf(input_folder, input_file, output_folder, output_file)
