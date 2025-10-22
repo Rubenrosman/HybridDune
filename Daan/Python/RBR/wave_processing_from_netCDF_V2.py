@@ -10,7 +10,7 @@ import xarray as xr
 import matplotlib.pyplot as plt
 import sys
 from scipy.signal import welch
-#sys.path.append(r'C:\Users\dpoppema\Documents\GitHub\HybridDune\Ruben\Pressure_sensors\S1\RBR_05') # to find the puv.py file
+sys.path.append(r'C:\Users\dpoppema\OneDrive - Delft University of Technology\Documents\GitHub\HybridDune\Ruben\Pressure_sensors\S1\RBR_05') # to find the puv.py file
 import puv 
 
 
@@ -142,15 +142,19 @@ def wave_statistics_netcdf(input_folder, input_file, output_folder, output_file)
         zi_block = np.repeat(ds0.zi.values, len(zb_block))
         zi_block2 = np.reshape(zi_block, (len(zi_block), 1))    # reshape from row to column vector for compatibility with p
 
-    # Filter pressure for negative pressures (filter 1), then calculate water depth ----------------------------------------------------
-    block_mask = ds_2D['p'] < 0
-    ds_2D['p'] = ds_2D['p'].where(~block_mask, 0)               # set negative pressures to zero
+    # # Filter 1: filter pressure for negative pressures, then calculate water depth ----------------------------------------------------
+    # NB: negative pressures were already set to zero in QC, but bandpass filtering can introduce negative pressures again
+    dry_mask_2D = ds_2D['p'] < 0                                 # true if dry
+    ds_2D['p'] = ds_2D['p'].where(~dry_mask_2D, 0)               # set negative pressures to zero. Syntax: where condition false, make zero
+    dry_mask_2D = ds_2D['p_IG'] < 0                                 
+    ds_2D['p_IG'] = ds_2D['p_IG'].where(~dry_mask_2D, 0)         
+    dry_mask_2D = ds_2D['p_WW'] < 0                                 
+    ds_2D['p_WW'] = ds_2D['p_WW'].where(~dry_mask_2D, 0) 
 
     # Compute water depth ----------------------------------------------------
     ds_2D['h_mean'] = ( (ds_2D['p'] / rho / g) + zi_block2 - zb_block2 ).mean(dim='N') # Mean water depth per burst: h=p/rho/g + (z_i-z_b)
     ds_out['h_mean'] = ds_2D['h_mean']
     ds_out['h_mean'].attrs = {'long_name': 'mean water depth', 'units': '[m]'} # avg per burst
-
 
     # ### COMPUTE WAVE STATISTICS. 3 TIMES: FOR FULL BANDPASS, INFRAGRAFITY AND WIND WAVES ###############################################################################
     # Attenuate signal: from pressure to surface elevation -------------------------------------
@@ -180,10 +184,20 @@ def wave_statistics_netcdf(input_folder, input_file, output_folder, output_file)
                                 output_core_dims=[['f'], ['N']],
                                 vectorize=True)
 
+    # Filter 2: make depths NaN if negative -------------------------------------
+    # Again, negative pressures were already set to zero above, but wave attenuation can introduce negative depths
+    dry_mask_2D = h < 0                            # true if dry
+    h = h.where(~dry_mask_2D, 0)                   # set negative depths to zero
+    dry_mask_2D = h_IG < 0                            
+    h_IG = h_IG.where(~dry_mask_2D, 0)                   
+    dry_mask_2D = h_WW < 0                          
+    h_WW = h_WW.where(~dry_mask_2D, 0)                   
+
     # Calculate water surface elevation from depth -------------------------------------
     ds_2D['zs']    = zb_block2 + h                                                 # water level (surface elevation) = bed level + depth
     ds_2D['zs_IG'] = zb_block2 + h_IG
     ds_2D['zs_WW'] = zb_block2 + h_WW
+
 
     ds_out['zs']    = ('t_full',np.ravel(ds_2D['zs']))
     ds_out['zs_IG'] = ('t_full',np.ravel(ds_2D['zs_IG']))                        
@@ -191,6 +205,7 @@ def wave_statistics_netcdf(input_folder, input_file, output_folder, output_file)
     ds_out['h']     = ('t_full',np.ravel(h))
     ds_out['h_IG']  = ('t_full',np.ravel(h_IG))
     ds_out['h_WW']  = ('t_full',np.ravel(h_WW))
+    ds_out['zs_mean'] = zb_block + ds_out['h_mean']
 
     ds_out['zs'].attrs    = {'units': 'm +NAP', 'long_name': 'surface elevation'}   # DAAN: CHECK: MORE METADATA NEEDED?
     ds_out['zs_IG'].attrs = {'units': 'm +NAP', 'long_name': 'surface elevation infragrafity waves'}   
@@ -198,19 +213,20 @@ def wave_statistics_netcdf(input_folder, input_file, output_folder, output_file)
     ds_out['h'].attrs     = {'units': 'm', 'long_name': 'water depth'}              
     ds_out['h_IG'].attrs  = {'units': 'm', 'long_name': 'water depth infragrafity waves'}
     ds_out['h_WW'].attrs  = {'units': 'm', 'long_name': 'water depth wind waves'}
+    ds_out['zs_mean'].attrs = {'long_name': 'mean surface elevation', 'units': '[m]'} # avg per burst
 
-    # Filter 2: make blocks NaN if more than 25% of the observations had a depth_above_instrument < 0.05 m
-    block_mask = ((ds_2D['zs'] - zi_block2) < 0.05).mean(dim='N') >= 0.25 # to be used for for Welch, calculation wave properties:
+    # Filter 3: make blocks NaN if more than 25% of the observations had a depth_above_instrument < 0.05 m
+    dry_mask_block = ((ds_2D['zs'] - zi_block2) < 0.05).mean(dim='N') >= 0.25 # to be used for for Welch, calculation wave properties:
     z_filtered = ds_2D['zs']
     z_filtered_IG = ds_2D['zs_IG']
     z_filtered_WW = ds_2D['zs_WW']
-    z_filtered    = z_filtered.where(~block_mask, np.nan)
-    z_filtered_IG = z_filtered_IG.where(~block_mask, np.nan)
-    z_filtered_WW = z_filtered_WW.where(~block_mask, np.nan)
+    z_filtered    = z_filtered.where(~dry_mask_block, np.nan)
+    z_filtered_IG = z_filtered_IG.where(~dry_mask_block, np.nan)
+    z_filtered_WW = z_filtered_WW.where(~dry_mask_block, np.nan)
 
     # Determine wave spectrum -------------------------------------
     ufunc_welch = lambda p: welch(p, fs=ds0.sf.values, nperseg=nperseg, detrend='constant', window='hann') # Detrend: is per segment. 1min, about constant, so false used
-
+    # Daan: constrant detrend in True veranderd. 
     ds_2D['frequencies'], ds_2D['psd'] = xr.apply_ufunc(ufunc_welch,
                                                     z_filtered,
                                                     input_core_dims=[['N']],
@@ -251,6 +267,7 @@ def wave_statistics_netcdf(input_folder, input_file, output_folder, output_file)
                                                                             input_core_dims=[['f']],
                                                                             output_core_dims=[[], [], [], [], [], []],
                                                                             vectorize=True)
+    
     ds_out['Hm0'].attrs = ds_out['Hm0_IG'].attrs = ds_out['Hm0_WW'].attrs = {'units': 'm', 'long_name': 'significant wave height: Hm0=4sqrt(m0), with m0 zeroth-order spectral moment'}
     ds_out['Tp'].attrs = ds_out['Tp_IG'].attrs = ds_out['Tp_WW'].attrs = {'units': 's', 'long_name': 'peak wave period'}
     ds_out['Tm01'].attrs = ds_out['Tm01_IG'].attrs = ds_out['Tm01_WW'].attrs = {'units': 's', 'long_name': 'mean wave period: Tm01 = m0/m1'}
@@ -258,6 +275,10 @@ def wave_statistics_netcdf(input_folder, input_file, output_folder, output_file)
     ds_out['Tmm10'].attrs = ds_out['Tmm10_IG'].attrs = ds_out['Tmm10_WW'].attrs = {'units': 's', 'long_name': 'T-1,0: mean absolute wave period T-1,0 = m_(-1)/m_0'}
     ds_out['Tps'].attrs = ds_out['Tps_IG'].attrs = ds_out['Tps_WW'].attrs = {'units': 's', 'long_name': 'Smoothed peak wave period'}
 
+    # Apply mask, to ensure NaNs where sensor is dry (zs was already made nan, but Tp etc. based on zs can still have values)
+    ds_out[['Hm0', 'Tp', 'Tm01', 'Tm02', 'Tmm10', 'Tps']] = ds_out[['Hm0', 'Tp', 'Tm01', 'Tm02', 'Tmm10', 'Tps']].where(~dry_mask_block, np.nan)
+    ds_out[['Hm0_IG', 'Tp_IG', 'Tm01_IG', 'Tm02_IG', 'Tmm10_IG', 'Tps_IG']] = ds_out[['Hm0_IG', 'Tp_IG', 'Tm01_IG', 'Tm02_IG', 'Tmm10_IG', 'Tps_IG']].where(~dry_mask_block, np.nan)
+    ds_out[['Hm0_WW', 'Tp_WW', 'Tm01_WW', 'Tm02_WW', 'Tmm10_WW', 'Tps_WW']] = ds_out[['Hm0_WW', 'Tp_WW', 'Tm01_WW', 'Tm02_WW', 'Tmm10_WW', 'Tps_WW']].where(~dry_mask_block, np.nan)
 
     # ### SKEWNESS AND ASYMMETRY ################################################################################################################################
     ## skewness of waves ##
@@ -268,10 +289,11 @@ def wave_statistics_netcdf(input_folder, input_file, output_folder, output_file)
                                                     input_core_dims=[['N']],
                                                     output_core_dims=[[], [], []],
                                                     vectorize=True)
+    
+    ds_out[['Sk', 'As', 'sigma']] = ds_out[['Sk', 'As', 'sigma']].where(~dry_mask_block, np.nan) # Apply mask, to ensure NaNs where sensor is dry 
     ds_out['Sk'].attrs = {'units': 'm3', 'long name': 'wave skewness'}
     ds_out['As'].attrs = {'units': 'm3', 'long name': 'wave asymmetry'}
     ds_out['sigma'].attrs = {'units': 'm', 'long name': 'standard deviation'}
-
 
     # ### Save to netcdf ################################################################################################################################  
     # Compression settings
@@ -299,37 +321,37 @@ def wave_statistics_netcdf(input_folder, input_file, output_folder, output_file)
     ds_out.to_netcdf(ncOutFile, encoding=encoding)
 
 # ■■■■■■■■■■■■■■■■■■■■■■■■■■■■■■■■■■■■■■■■■■■■■■■    DEFINE INPUT/OUTPUT FILES AND RUN FUNCTION  ■■■■■■■■■■■■■■■■■■■■■■■■■■■■■■■■■■■■■■■■■■■■■■■    
-# # RBR files, period 1 -------------------------------------------------------------------------------------------------------------------------------
-# input_folder = r'O:\HybridDune experiment\data RBR, OSSI\copy RBR Udrive series1\QC'
-# output_folder = r'O:\HybridDune experiment\data RBR, OSSI\copy RBR Udrive series1\processed'
-# names_all = ['S1P3 RBR5', 'S2P3 RBR1', 'S3P3 RBR6', 'S4P3 RBR2','S1P2 RBR3'] # part of file name that refers to sensor
+# RBR files, period 1 -------------------------------------------------------------------------------------------------------------------------------
+input_folder = r'O:\HybridDune experiment\data RBR, OSSI\netcdf\QC\Deployment period 1'
+output_folder = r'O:\HybridDune experiment\data RBR, OSSI\netcdf\processed\Deployment period 1'
+names_all = ['S1P3 RBR5', 'S2P3 RBR1', 'S3P3 RBR6', 'S4P3 RBR2','S1P2 RBR3'] # part of file name that refers to sensor
 
-# for i in range(0,5):
-#     input_file = 'Pressure sensor ' + names_all[i] + ' p_rel - period 1.nc'
-#     output_file = 'Pressure sensor ' + names_all[i] + ' processed data - period 1.nc'
+for i in range(0,5):
+    input_file = 'Pressure sensor ' + names_all[i] + ' p_rel - period 1.nc'
+    output_file = 'Pressure sensor ' + names_all[i] + ' processed data - period 1 V2.nc'
 
-#     # Call the function to process the wave data
-#     wave_statistics_netcdf(input_folder, input_file, output_folder, output_file)
-#     print(f"Processed data saved to {output_file}")
+    # Call the function to process the wave data
+    wave_statistics_netcdf(input_folder, input_file, output_folder, output_file)
+    print(f"Processed data saved to {output_file}")
 
 
-# # RBR files, period 2 -------------------------------------------------------------
-# input_folder = r'O:\HybridDune experiment\data RBR, OSSI\copy RBR Udrive series2\QC'
-# output_folder = r'O:\HybridDune experiment\data RBR, OSSI\copy RBR Udrive series2\processed'
-# names_all = ['S3P3 RBR6', 'S1P2 RBR2', 'S3P2 RBR4', 'S4P2 RBR1','S3P1 RBR5'] # part of file name that refers to sensor
+# RBR files, period 2 -------------------------------------------------------------
+input_folder = r'O:\HybridDune experiment\data RBR, OSSI\netcdf\QC\Deployment period 2'
+output_folder = r'O:\HybridDune experiment\data RBR, OSSI\netcdf\processed\Deployment period 2'
+names_all = ['S3P3 RBR6', 'S1P2 RBR2', 'S3P2 RBR4', 'S4P2 RBR1','S3P1 RBR5'] # part of file name that refers to sensor
 
-# for i in range(0,5):
-#     input_file = 'Pressure sensor ' + names_all[i] + ' p_rel - period 2.nc'
-#     output_file = 'Pressure sensor ' + names_all[i] + ' processed data - period 2.nc'
+for i in range(0,5):
+    input_file = 'Pressure sensor ' + names_all[i] + ' p_rel - period 2.nc'
+    output_file = 'Pressure sensor ' + names_all[i] + ' processed data - period 2.nc'
 
-#     # Call the function to process the wave data
-#     wave_statistics_netcdf(input_folder, input_file, output_folder, output_file)
-#     print(f"Processed data saved to {output_file}")
+    # Call the function to process the wave data
+    wave_statistics_netcdf(input_folder, input_file, output_folder, output_file)
+    print(f"Processed data saved to {output_file}")
 
 
 # OSSI files, period 1 -------------------------------------------------------------
-input_folder = r'O:\HybridDune experiment\data RBR, OSSI\Ossi data\QC'
-output_folder = r'O:\HybridDune experiment\data RBR, OSSI\Ossi data\processed'
+input_folder = r'O:\HybridDune experiment\data RBR, OSSI\netcdf\QC\Deployment period 1'
+output_folder = r'O:\HybridDune experiment\data RBR, OSSI\netcdf\processed\Deployment period 1'
 names_all = ['S2P2 Ossi1', 'S3P2 Ossi2', 'S4P2 Ossi3',  'S1P1 Ossi4', 'S2P1 Ossi5', 'S3P1 Ossi6', 'S4P1 Ossi7'] # part of file name that refers to sensor
 
 for i in range(0,7):
