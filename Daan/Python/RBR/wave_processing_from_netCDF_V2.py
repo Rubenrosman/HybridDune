@@ -207,7 +207,7 @@ def wave_statistics_netcdf(input_folder, input_file, output_folder, output_file)
     ds_out['h_WW']  = ('t_full',np.ravel(h_WW))
     ds_out['zs_mean'] = zb_block + ds_out['h_mean']
 
-    ds_out['zs'].attrs    = {'units': 'm +NAP', 'long_name': 'surface elevation'}   # DAAN: CHECK: MORE METADATA NEEDED?
+    ds_out['zs'].attrs    = {'units': 'm +NAP', 'long_name': 'surface elevation'}   
     ds_out['zs_IG'].attrs = {'units': 'm +NAP', 'long_name': 'surface elevation infragrafity waves'}   
     ds_out['zs_WW'].attrs = {'units': 'm +NAP', 'long_name': 'surface elevation wind waves'}   
     ds_out['h'].attrs     = {'units': 'm', 'long_name': 'water depth'}              
@@ -226,7 +226,6 @@ def wave_statistics_netcdf(input_folder, input_file, output_folder, output_file)
 
     # Determine wave spectrum -------------------------------------
     ufunc_welch = lambda p: welch(p, fs=ds0.sf.values, nperseg=nperseg, detrend='constant', window='hann') # Detrend: is per segment. 1min, about constant, so false used
-    # Daan: constrant detrend in True veranderd. 
     ds_2D['frequencies'], ds_2D['psd'] = xr.apply_ufunc(ufunc_welch,
                                                     z_filtered,
                                                     input_core_dims=[['N']],
@@ -282,7 +281,7 @@ def wave_statistics_netcdf(input_folder, input_file, output_folder, output_file)
 
     # ### SKEWNESS AND ASYMMETRY ################################################################################################################################
     ## skewness of waves ##
-    ufunc = lambda p: puv.compute_SkAs(ds0.sf.values,p,fpfac =None, fbounds = None)     # Daan: check calculation, metadata
+    ufunc = lambda p: puv.compute_SkAs(ds0.sf.values,p,fpfac =None, fbounds = None)     
 
     ds_out['Sk'], ds_out['As'], ds_out['sigma'] =  xr.apply_ufunc(ufunc,
                                                     ds_2D['p'], 
@@ -290,9 +289,11 @@ def wave_statistics_netcdf(input_folder, input_file, output_folder, output_file)
                                                     output_core_dims=[[], [], []],
                                                     vectorize=True)
     
+    ds_out['Sk'] = ds_out['Sk'] / ds_out['sigma']**3  # normalize skewness (dividing by <p²>^1.5 is dividing by σ^3)    
+    ds_out['As'] = ds_out['As'] / ds_out['sigma']**3  # normalize asymmetry
     ds_out[['Sk', 'As', 'sigma']] = ds_out[['Sk', 'As', 'sigma']].where(~dry_mask_block, np.nan) # Apply mask, to ensure NaNs where sensor is dry 
-    ds_out['Sk'].attrs = {'units': 'm3', 'long name': 'wave skewness'}
-    ds_out['As'].attrs = {'units': 'm3', 'long name': 'wave asymmetry'}
+    ds_out['Sk'].attrs = {'units': '-', 'long name': 'wave skewness'}
+    ds_out['As'].attrs = {'units': '-', 'long name': 'wave asymmetry'}  
     ds_out['sigma'].attrs = {'units': 'm', 'long name': 'standard deviation'}
 
     # ### Save to netcdf ################################################################################################################################  

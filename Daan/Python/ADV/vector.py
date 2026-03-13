@@ -3,7 +3,6 @@ import os
 import numpy as np
 import pandas as pd
 import xarray as xr
-import KNMI_readers as readers
 
 class Vector(object):
     '''
