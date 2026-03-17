@@ -1,0 +1,81 @@
+ %%{init: {'flowchart': {'nodeSpacing': 25, 'rankSpacing': 25}}}%%
+ flowchart TD
+
+P1 --> P2 --> P3 --> P4 --> P5 --> P6 --> P7 --> P8 --> P9
+
+subgraph P1[Preprocessing]
+A1[Load pointcloud]
+A2[Filter frame]
+
+A1 --> A2 
+end
+
+subgraph P2[Profile extraction]
+B1[Make 5 s windows per direction]
+B2[Remove smallest R until std < 1 cm]
+B4[R = Rmean]
+B5[R = NaN]
+
+B1 --> B2 
+B2 -->|≥50% remaining| B4
+B2 -->|<50% remaining| B5
+end
+
+subgraph P3[Remove invalid profiles]
+C1[Check: x_start < x_min<br>or gap > 0.5 m?]
+C1["`Check: x_start < x_min<br> **_or_**  gap > 0.5 m?`"]
+
+
+C2[Remove profile]
+
+C1 -->|Yes| C2
+end
+
+subgraph P4[Resample profiles for toe estimation]
+D1["Resample to 30 s <br> (nearest valid time)"]
+D3[Fill overhang]
+D4[Resample to 5 cm along arc length]
+D5[Gaussian smoothing <br>σ=20 cm]
+
+D1 --> D3 --> D4 --> D5
+end
+
+subgraph P5[Toe + crest detection]
+E1[toe: slope criterion]
+E2[crest: slope criterion]
+E3[Smooth positions in time <br> σ=5 min]
+
+E1 --> |first True|E3
+E2 --> |last True|E3
+end
+
+subgraph P6[Slumping detection]
+F1[z_min: 30 or 50 cm above toe]
+F2[Dune erosion above z_min]
+F3[Slumping: ΔV > 0.04 m³/m]
+
+F1 --> F2 --> F3
+end
+
+subgraph P7[Foam filtering]
+G1[timeseries z, intensity]
+G2[Rolling windows: <br>centered, 10 min]
+G3[Shift window edges: exclude slumping]
+G4["`Filter foam: outlier in z **_and_** I`"]
+
+G1 --> G2 --> G3 --> G4
+end
+
+subgraph P8[Fill missing values]
+H1["Use previous valid value <br> (don't cross slumping event)"]
+H2["Use next valid value"]
+H3["`**Result: final profiles**`"]
+
+H1 --> H2 --> H3
+end
+
+subgraph P9[Re-detect toe, crest]
+I1["Use final profiles, <br> only apply 1min temporal smoothing"]
+
+I1
+end
